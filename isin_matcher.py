@@ -76,17 +76,20 @@ def get_isin_for_company(company_name: str, excel_file: str = 'accord_bse_mappin
             isin = row.get('CD_ISIN No', '')
             nse_symbol = row.get('CD_NSE Symbol', '')
             bse_code = row.get('CD_BSE Code', '')
+            industry = row.get('CD_Industry1', '')
             
             # Convert to string and handle NaN
             isin = str(isin) if pd.notna(isin) else ''
             nse_symbol = str(nse_symbol) if pd.notna(nse_symbol) else ''
             bse_code = str(bse_code) if pd.notna(bse_code) else ''
+            industry = str(industry) if pd.notna(industry) else ''
             
             results.append({
                 'matched_name': matched_name,
                 'isin': isin,
                 'nse_symbol': nse_symbol,
                 'bse_code': bse_code,
+                'industry': industry,
                 'rank': rank,
                 'score': score
             })

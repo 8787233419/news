@@ -12,6 +12,10 @@ import re
 from isin import extract_company_simple
 from isin_matcher import get_isin_for_company
 from prompts import summarize_multiple_articles, print_summary_results
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 if sys.platform == 'win32':
     try:
@@ -387,6 +391,90 @@ def print_json_results(articles):
     print(f"   Total content: {total_chars:,} characters")
     print("=" * 70)
 
+def send_slack_message(message):
+    slack_url=os.getenv("SLACK_URL")
+
+    if(slack_url):
+        # If a list is provided, send one Slack message per item
+        if isinstance(message, list):
+            for idx, item in enumerate([m for m in message if m and isinstance(m, str)], 1):
+                payload = {"text": item}
+                response = requests.post(slack_url, json=payload)
+                if response.status_code==200:
+                    print(f"Slack message {idx} sent successfully")
+                else:
+                    print(f"Failed to send Slack message {idx}: {response.status_code}")
+                    print(f"Error: {response.text}")
+        else:
+            text = str(message)
+            payload = {"text": text}
+            response = requests.post(slack_url, json=payload)
+            if response.status_code==200:
+                print("Slack message sent successfully")
+            else:
+                print(f"Failed to send Slack message: {response.status_code}")
+                print(f"Error: {response.text}")
+
+    else:
+        print("SLACK_URL not found in .env file")
+
+def format_slack_message_from_article(article: dict) -> str:
+    """Builds a Slack-ready text message with required lines.
+    Lines:
+    1) Company name
+    2) Summary
+    3) Industry
+    4) Link
+    5) Release Time (if available)
+    """
+    company = (
+        article.get("matched_company_name")
+        or article.get("company_name")
+        or "Unknown Company"
+    )
+    summary = (
+        (article.get("ai_summary", {}) or {}).get("summary")
+        or "No summary available"
+    )
+    industry = article.get("industry", "Unknown")
+    url = article.get("url", "")
+    pub_date_raw = article.get("pub_date")
+
+    release_time_line = ""
+    try:
+        if pub_date_raw:
+            dt = date_parser.parse(pub_date_raw)
+            if dt.tzinfo is not None:
+                dt = dt.replace(tzinfo=None)
+            release_time_line = f"\nRelease Time: {dt.strftime('%d-%m-%Y %H:%M:%S')}"
+    except Exception:
+        # If parsing fails, omit the release time line
+        release_time_line = ""
+
+    # Optional fields
+    sentiment = (
+        article.get("sentiment")
+        or (article.get("ai_summary", {}) or {}).get("sentiment")
+        or ""
+    )
+
+    lines = [
+        f"*{company}*",  # whole first line bold
+        f"*Summary:* {summary}",
+    ]
+
+    if sentiment:
+        lines.append(f"*Sentiment:* {sentiment}")
+
+    lines.append(f"*Industry:* {industry}")
+
+    if url:
+        lines.append(f"*Link:* {url}")
+
+    message = "\n".join(lines) + (f"\n*Release Time:* {release_time_line.split(': ',1)[1]}" if release_time_line else "")
+    message += "\n------------------------------"
+    return message
+
 async def main(processed_articles_set):
     # Fetch business news from RSS (filtering out already processed articles)
     articles = fetch_business_news_rss(processed_articles_set)
@@ -439,6 +527,7 @@ async def main(processed_articles_set):
                         article['isin_matches'] = matches
                         article['primary_isin'] = matches[0]['isin']
                         article['matched_company_name'] = matches[0]['matched_name']
+                        article['industry'] = matches[0].get('industry', '')
                         articles_with_isin.append(article)
                     
                     print(f"   ✅ {len(company_articles)} article(s) will be processed for summarization")
@@ -464,6 +553,17 @@ async def main(processed_articles_set):
                 articles_with_summaries = summarize_multiple_articles(articles_with_isin)
                 if articles_with_summaries:
                     print_summary_results(articles_with_summaries)
+
+                    # Prepare formatted Slack messages
+                    slack_messages = []
+                    for article in articles_with_summaries:
+                        msg = format_slack_message_from_article(article)
+                        if msg.strip():
+                            slack_messages.append(msg)
+
+                    if slack_messages:
+                        send_slack_message(slack_messages)
+                    
                 else:
                     print("\n⚠️  No articles to summarize")
             else:
