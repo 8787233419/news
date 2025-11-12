@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import asyncio
 from playwright.async_api import async_playwright
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil import parser as date_parser
 import sys
 import time
@@ -444,9 +444,13 @@ def format_slack_message_from_article(article: dict) -> str:
     try:
         if pub_date_raw:
             dt = date_parser.parse(pub_date_raw)
-            if dt.tzinfo is not None:
-                dt = dt.replace(tzinfo=None)
-            release_time_line = f"\nRelease Time: {dt.strftime('%d-%m-%Y %H:%M:%S')}"
+            # Convert to IST (UTC+5:30)
+            ist = timezone(timedelta(hours=5, minutes=30))
+            if dt.tzinfo is None:
+                # If no timezone info, assume UTC
+                dt = dt.replace(tzinfo=timezone.utc)
+            dt_ist = dt.astimezone(ist)
+            release_time_line = f"\nRelease Time: {dt_ist.strftime('%d-%m-%Y %H:%M:%S')} IST"
     except Exception:
         # If parsing fails, omit the release time line
         release_time_line = ""

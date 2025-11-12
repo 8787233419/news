@@ -1,6 +1,6 @@
 """
-Fuzzy ISIN matcher
-Uses fuzzy string matching to find top 3 company matches and their ISIN numbers
+RapidFuzz ISIN matcher
+Uses RapidFuzz (faster fuzzy matching) to find top 3 company matches and their ISIN numbers
 """
 
 import sys
@@ -13,7 +13,7 @@ if sys.platform == 'win32':
         pass
 
 import pandas as pd
-from fuzzywuzzy import fuzz, process
+from rapidfuzz import fuzz, process
 
 
 def get_isin_for_company(company_name: str, excel_file: str = 'accord_bse_mapping_original.xlsx', top_n: int = 3, min_score: int = 70) -> list:

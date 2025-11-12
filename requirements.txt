@@ -17,8 +17,7 @@ python-dateutil>=2.8.0
 
 # For ISIN Matching (news_with_isin_scraper.py, company_isin_matcher.py)
 openai>=1.3.0
-fuzzywuzzy>=0.18.0
-python-Levenshtein>=0.21.0
+rapidfuzz>=3.0.0
 
 # For LangChain-powered ISIN Matching (news_isin_langchain.py, isin.py, isin_matcher.py)
 langchain>=0.1.0
